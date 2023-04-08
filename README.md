@@ -18,34 +18,38 @@ The principle of seata-go is consistent with that of Seata-java, which is compos
 
 - [x] TCC
 - [ ] XA
-- [ ] AT
+- [x] AT
+  - [x] Insert SQL
+  - [x] Delete SQL
+  - [x] Insert on update SQL
+  - [x] Multi update SQL
+  - [x] Multi delete SQL
+  - [x] Select for update SQL
+  - [x] Update SQL
 - [ ] SAGA
-- [ ] TM
+- [x] TM
 - [x] RPC communication
-- [ ] Transaction anti suspension
-- [ ] Null compensation
+- [x] Transaction anti suspension
+  - [x] Manually way
+  - [x] Proxy datasource way 
+- [x] Null compensation
 - [ ] Configuration center
+  - [x] Configuration file
 - [ ] Registration Center
 - [ ] Metric monitoring
+- [x] Compressor algorithm
 - [x] Examples
 
 
 ## How to run？
 
-1. Start the seata-server service with the docker file under the sample/dockercomposer folder
-
-   ~~~shell
-   cd sample/dockercompose
-   docker-compose -f docker-compose.yml up -d seata-server
-   ~~~
-
-2. Just execute the main function under samples/ in the root directory
-
+if you want to know how to use and integrate seata-go, please refer to [seata/seata-go-samples](https://github.com/seata/seata-go-samples)
 
 ## How to join us？
 
 Seata-go is currently in the construction stage. Welcome colleagues in the industry to join the group and work with us to promote the construction of seata-go! If you want to contribute code to seata-go, you can refer to the  [**code contribution Specification**](./CONTRIBUTING_CN.md)  document to understand the specifications of the community, or you can join our community DingTalk group: 33069364 and communicate together!
 
+![image](https://user-images.githubusercontent.com/38887641/210141444-0ba6b11d-16e6-48af-945b-cb99ecfa70ef.png)
 
 ## Licence
 

@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/seata/seata-go/pkg/datasource/sql/datasource"
 	"github.com/seata/seata-go/pkg/datasource/sql/types"
+	"github.com/seata/seata-go/pkg/util/log"
 )
 
 // IsRecordsEquals check before record and after record if equal
@@ -40,7 +42,7 @@ func IsRecordsEquals(beforeImage *types.RecordImage, afterImage *types.RecordIma
 		return true, nil
 	}
 
-	return compareRows(beforeImage.TableMeta, beforeImage.Rows, afterImage.Rows)
+	return compareRows(*beforeImage.TableMeta, beforeImage.Rows, afterImage.Rows)
 }
 
 func compareRows(tableMeta types.TableMeta, oldRows []types.RowImage, newRows []types.RowImage) (bool, error) {
@@ -50,14 +52,13 @@ func compareRows(tableMeta types.TableMeta, oldRows []types.RowImage, newRows []
 	for key, oldRow := range oldRowMap {
 		newRow := newRowMap[key]
 		if newRow == nil {
-			return false, fmt.Errorf("compare row failed, rowKey %s, reason [newField is null]", key)
+			log.Infof("compare row failed, rowKey %s, reason new field is null", key)
+			return false, nil
 		}
 		for fieldName, oldValue := range oldRow {
 			newValue := newRow[fieldName]
-			if newValue == nil {
-				return false, fmt.Errorf("compare row failed, rowKey %s, fieldName %s, reason [newField is null]", key, fieldName)
-			}
-			if newValue != oldValue {
+			if !datasource.DeepEqual(newValue, oldValue) {
+				log.Infof("compare row failed, rowKey %s, fieldName %s, oldValue %v, newValud %v", key, fieldName, oldValue, newValue)
 				return false, nil
 			}
 		}
@@ -79,7 +80,7 @@ func rowListToMap(rows []types.RowImage, primaryKeyList []string) map[string]map
 						rowKey += "_##$$_"
 					}
 					// todo make value more accurate
-					rowKey = fmt.Sprintf("%v%v", rowKey, column.Value)
+					rowKey = fmt.Sprintf("%v%v", rowKey, column.GetActualValue())
 					firstUnderline = true
 				}
 			}
@@ -88,4 +89,75 @@ func rowListToMap(rows []types.RowImage, primaryKeyList []string) map[string]map
 		rowMap[rowKey] = fieldMap
 	}
 	return rowMap
+}
+
+// buildWhereConditionByPKs build where condition by primary keys
+// each pk is a condition.the result will like :" (id,userCode) in ((?,?),(?,?)) or (id,userCode) in ((?,?),(?,?) ) or (id,userCode) in ((?,?))"
+func buildWhereConditionByPKs(pkNameList []string, rowSize int, maxInSize int) string {
+	var (
+		whereStr  = &strings.Builder{}
+		batchSize = rowSize/maxInSize + 1
+	)
+
+	if rowSize%maxInSize == 0 {
+		batchSize = rowSize / maxInSize
+	}
+
+	for batch := 0; batch < batchSize; batch++ {
+		if batch > 0 {
+			whereStr.WriteString(" OR ")
+		}
+		whereStr.WriteString("(")
+
+		for i := 0; i < len(pkNameList); i++ {
+			if i > 0 {
+				whereStr.WriteString(",")
+			}
+			// todo add escape
+			whereStr.WriteString(fmt.Sprintf("`%s`", pkNameList[i]))
+		}
+		whereStr.WriteString(") IN (")
+
+		var eachSize int
+
+		if batch == batchSize-1 {
+			if rowSize%maxInSize == 0 {
+				eachSize = maxInSize
+			} else {
+				eachSize = rowSize % maxInSize
+			}
+		} else {
+			eachSize = maxInSize
+		}
+
+		for i := 0; i < eachSize; i++ {
+			if i > 0 {
+				whereStr.WriteString(",")
+			}
+			whereStr.WriteString("(")
+			for j := 0; j < len(pkNameList); j++ {
+				if j > 0 {
+					whereStr.WriteString(",")
+				}
+				whereStr.WriteString("?")
+			}
+			whereStr.WriteString(")")
+		}
+		whereStr.WriteString(")")
+	}
+	return whereStr.String()
+}
+
+func buildPKParams(rows []types.RowImage, pkNameList []string) []interface{} {
+	params := make([]interface{}, 0)
+	for _, row := range rows {
+		coumnMap := row.GetColumnMap()
+		for _, pk := range pkNameList {
+			col := coumnMap[pk]
+			if col != nil {
+				params = append(params, col.Value)
+			}
+		}
+	}
+	return params
 }

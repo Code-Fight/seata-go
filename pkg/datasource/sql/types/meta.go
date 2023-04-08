@@ -18,7 +18,7 @@
 package types
 
 import (
-	"database/sql"
+	"fmt"
 	"reflect"
 )
 
@@ -26,18 +26,20 @@ import (
 type ColumnMeta struct {
 	// Schema
 	Schema string
-	// Table
-	Table string
-	// ColumnTypeInfo
-	ColumnTypeInfo *sql.ColumnType
+	Table  string
+	// ColumnDef  the column default
+	ColumnDef []byte
 	// Autoincrement
 	Autoincrement bool
-	ColumnName    string
-	ColumnType    string
-	DataType      int32
-	ColumnKey     string
-	IsNullable    int8
-	Extra         string
+	// todo get columnType
+	//ColumnTypeInfo *sql.ColumnType
+	ColumnName         string
+	ColumnType         string
+	DatabaseType       int32
+	DatabaseTypeString string
+	ColumnKey          string
+	IsNullable         int8
+	Extra              string
 }
 
 type ColumnType struct {
@@ -118,4 +120,32 @@ func (m TableMeta) GetPrimaryKeyOnlyName() []string {
 		}
 	}
 	return keys
+}
+
+// GetPrimaryKeyType get PK database type
+func (m TableMeta) GetPrimaryKeyType() (int32, error) {
+	for _, index := range m.Indexs {
+		if index.IType == IndexTypePrimaryKey {
+			for i := range index.Columns {
+				return index.Columns[i].DatabaseType, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("get primary key type error")
+}
+
+// GetPrimaryKeyTypeStrMap get all PK type to map
+func (m TableMeta) GetPrimaryKeyTypeStrMap() (map[string]string, error) {
+	pkMap := make(map[string]string)
+	for _, index := range m.Indexs {
+		if index.IType == IndexTypePrimaryKey {
+			for i := range index.Columns {
+				pkMap[index.ColumnName] = index.Columns[i].DatabaseTypeString
+			}
+		}
+	}
+	if len(pkMap) == 0 {
+		return nil, fmt.Errorf("get primary key type error")
+	}
+	return pkMap, nil
 }

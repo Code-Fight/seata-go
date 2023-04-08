@@ -18,9 +18,8 @@
 package sql
 
 import (
-	"github.com/seata/seata-go/pkg/datasource/sql/undo"
-
 	"github.com/pkg/errors"
+	"github.com/seata/seata-go/pkg/datasource/sql/undo"
 )
 
 // ATTx
@@ -43,7 +42,7 @@ func (tx *ATTx) Rollback() error {
 
 		originTx := tx.tx
 
-		if originTx.tranCtx.OpenGlobalTrsnaction() && originTx.tranCtx.IsBranchRegistered() {
+		if originTx.tranCtx.OpenGlobalTransaction() && originTx.tranCtx.IsBranchRegistered() {
 			originTx.report(false)
 		}
 	}
@@ -54,7 +53,6 @@ func (tx *ATTx) Rollback() error {
 // commitOnAT
 func (tx *ATTx) commitOnAT() error {
 	originTx := tx.tx
-
 	if err := originTx.register(originTx.tranCtx); err != nil {
 		return err
 	}

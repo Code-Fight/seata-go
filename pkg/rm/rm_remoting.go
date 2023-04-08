@@ -18,6 +18,7 @@
 package rm
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -59,7 +60,11 @@ func (r *RMRemoting) BranchRegister(param BranchRegisterParam) (int64, error) {
 		log.Errorf("BranchRegister error: %v, res %v", err.Error(), resp)
 		return 0, err
 	}
-	return resp.(message.BranchRegisterResponse).BranchId, nil
+	branchResp := resp.(message.BranchRegisterResponse)
+	if branchResp.ResultCode == message.ResultCodeFailed {
+		return 0, fmt.Errorf("Response %s", branchResp.Msg)
+	}
+	return branchResp.BranchId, nil
 }
 
 // BranchReport Report status of transaction branch
@@ -88,16 +93,34 @@ func (r *RMRemoting) BranchReport(param BranchReportParam) error {
 
 // LockQuery Query lock status of transaction branch
 func (r *RMRemoting) LockQuery(param LockQueryParam) (bool, error) {
+	req := message.GlobalLockQueryRequest{
+		BranchRegisterRequest: message.BranchRegisterRequest{
+			Xid:        param.Xid,
+			LockKey:    param.LockKeys,
+			ResourceId: param.ResourceId,
+			BranchType: param.BranchType,
+		},
+	}
+	res, err := getty.GetGettyRemotingClient().SendSyncRequest(req)
+	if err != nil {
+		log.Errorf("send lock query request error: {%#v}", err.Error())
+		return false, err
+	}
+
+	if isQueryLockSuccess(res) {
+		log.Infof("lock is lockable, lock %s", param.LockKeys)
+		return true, nil
+	}
+	log.Infof("lock is unlockable, lock %s", param.LockKeys)
 	return false, nil
 }
 
 func (r *RMRemoting) RegisterResource(resource Resource) error {
 	req := message.RegisterRMRequest{
 		AbstractIdentifyRequest: message.AbstractIdentifyRequest{
-			// todo replace with config
 			Version:                 "1.5.2",
-			ApplicationId:           "tcc-sample",
-			TransactionServiceGroup: "my_test_tx_group",
+			ApplicationId:           rmConfig.ApplicationID,
+			TransactionServiceGroup: rmConfig.TxServiceGroup,
 		},
 		ResourceIds: resource.GetResourceId(),
 	}
@@ -116,6 +139,13 @@ func (r *RMRemoting) RegisterResource(resource Resource) error {
 	return nil
 }
 
+func isQueryLockSuccess(response interface{}) bool {
+	if res, ok := response.(message.GlobalLockQueryResponse); ok {
+		return res.Lockable
+	}
+	return false
+}
+
 func isRegisterSuccess(response interface{}) bool {
 	if res, ok := response.(message.RegisterRMResponse); ok {
 		return res.Identified
@@ -126,7 +156,7 @@ func isRegisterSuccess(response interface{}) bool {
 func isReportSuccess(response interface{}) error {
 	if res, ok := response.(message.BranchReportResponse); ok {
 		if res.ResultCode == message.ResultCodeFailed {
-			return errors.New(res.Msg)
+			return fmt.Errorf(res.Msg)
 		}
 	} else {
 		return ErrBranchReportResponseFault

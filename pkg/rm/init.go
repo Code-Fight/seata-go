@@ -17,11 +17,16 @@
 
 package rm
 
-// Init init seata client
-func Init() {
-	initRmClient()
+var rmConfig RmConfig
+
+type RmConfig struct {
+	Config
+
+	ApplicationID  string
+	TxServiceGroup string
 }
 
 // InitRmClient init seata rm client
-func initRmClient() {
+func InitRm(cfg RmConfig) {
+	rmConfig = cfg
 }

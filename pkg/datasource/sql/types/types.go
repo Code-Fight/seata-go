@@ -27,11 +27,9 @@ import (
 	"github.com/google/uuid"
 )
 
-//go:generate stringer -type=DBType
 type DBType int16
 
 type (
-	// DBType
 	// BranchPhase
 	BranchPhase int8
 	// IndexType index type
@@ -42,6 +40,13 @@ const (
 	IndexTypeNull       IndexType = 0
 	IndexTypePrimaryKey IndexType = 1
 )
+
+func ParseIndexType(str string) IndexType {
+	if str == "PRIMARY_KEY" {
+		return IndexTypePrimaryKey
+	}
+	return IndexTypeNull
+}
 
 func (i IndexType) MarshalText() (text []byte, err error) {
 	switch i {
@@ -95,24 +100,24 @@ func ParseDBType(driverName string) DBType {
 	}
 }
 
-// TransactionType
-type TransactionType int8
+type TransactionMode int8
 
 const (
-	_ TransactionType = iota
+	_ TransactionMode = iota
 	Local
 	XAMode
 	ATMode
 )
 
-func (t TransactionType) GetBranchType() branch.BranchType {
-	if t == XAMode {
+func (t TransactionMode) BranchType() branch.BranchType {
+	switch t {
+	case XAMode:
 		return branch.BranchTypeXA
-	}
-	if t == ATMode {
+	case ATMode:
 		return branch.BranchTypeAT
+	default:
+		return branch.BranchTypeUnknow
 	}
-	return branch.BranchTypeUnknow
 }
 
 // TransactionContext seata-go‘s context of transaction
@@ -125,8 +130,8 @@ type TransactionContext struct {
 	DBType DBType
 	// TxOpt transaction option
 	TxOpt driver.TxOptions
-	// TransType transaction mode, eg. XA/AT
-	TransType TransactionType
+	// TransactionMode transaction mode, eg. XA/AT
+	TransactionMode TransactionMode
 	// ResourceID resource id, database-table
 	ResourceID string
 	// BranchID transaction branch unique id
@@ -141,35 +146,36 @@ type TransactionContext struct {
 
 // ExecContext
 type ExecContext struct {
-	TxCtx        *TransactionContext
-	Query        string
+	TxCtx *TransactionContext
+	Query string
+	// todo delete
 	ParseContext *ParseContext
 	NamedValues  []driver.NamedValue
-	Values       []driver.Value
-	// todo 待删除
+	// todo delete
+	Values []driver.Value
+	// todo delete
 	MetaDataMap map[string]TableMeta
 	Conn        driver.Conn
 	DBName      string
 	DBType      DBType
 	// todo set values for these 4 param
-	IsAutoCommit          bool
-	IsSupportsSavepoints  bool
-	IsInGlobalTransaction bool
-	IsRequireGlobalLock   bool
+	IsAutoCommit         bool
+	IsSupportsSavepoints bool
+	IsRequireGlobalLock  bool
 }
 
 func NewTxCtx() *TransactionContext {
 	return &TransactionContext{
-		LockKeys:     make(map[string]struct{}, 0),
-		TransType:    Local,
-		LocalTransID: uuid.New().String(),
-		RoundImages:  &RoundRecordImage{},
+		LockKeys:        make(map[string]struct{}, 0),
+		TransactionMode: Local,
+		LocalTransID:    uuid.New().String(),
+		RoundImages:     &RoundRecordImage{},
 	}
 }
 
 // HasUndoLog
 func (t *TransactionContext) HasUndoLog() bool {
-	return t.TransType == ATMode && !t.RoundImages.IsEmpty()
+	return t.TransactionMode == ATMode && !t.RoundImages.IsEmpty()
 }
 
 // HasLockKey
@@ -177,8 +183,8 @@ func (t *TransactionContext) HasLockKey() bool {
 	return len(t.LockKeys) != 0
 }
 
-func (t *TransactionContext) OpenGlobalTrsnaction() bool {
-	return t.TransType != Local
+func (t *TransactionContext) OpenGlobalTransaction() bool {
+	return t.TransactionMode != Local
 }
 
 func (t *TransactionContext) IsBranchRegistered() bool {

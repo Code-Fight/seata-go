@@ -39,10 +39,6 @@ const (
 	OnlyCareUpdateColumns = true
 )
 
-func init() {
-	undo.RegisterUndoLogBuilder(types.UpdateExecutor, GetMySQLUpdateUndoLogBuilder)
-}
-
 type MySQLUpdateUndoLogBuilder struct {
 	BasicUndoLogBuilder
 }
@@ -71,7 +67,7 @@ func (u *MySQLUpdateUndoLogBuilder) BeforeImage(ctx context.Context, execCtx *ty
 		return nil, err
 	}
 
-	tableName, _ := execCtx.ParseContext.GteTableName()
+	tableName, _ := execCtx.ParseContext.GetTableName()
 	metaData, err := datasource.GetTableCache(types.DBTypeMySQL).GetTableMeta(ctx, execCtx.DBName, tableName)
 	if err != nil {
 		return nil, err
@@ -109,12 +105,16 @@ func (u *MySQLUpdateUndoLogBuilder) AfterImage(ctx context.Context, execCtx *typ
 		return []*types.RecordImage{{}}, nil
 	}
 
+	if beforeImages == nil || len(beforeImages) == 0 || len(beforeImages[0].Rows) == 0 {
+		return beforeImages, nil
+	}
+
 	var beforeImage *types.RecordImage
 	if len(beforeImages) > 0 {
 		beforeImage = beforeImages[0]
 	}
 
-	tableName, _ := execCtx.ParseContext.GteTableName()
+	tableName, _ := execCtx.ParseContext.GetTableName()
 	metaData, err := datasource.GetTableCache(types.DBTypeMySQL).GetTableMeta(ctx, execCtx.DBName, tableName)
 	if err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (u *MySQLUpdateUndoLogBuilder) buildBeforeImageSQL(ctx context.Context, exe
 		}
 
 		// select indexes columns
-		tableName, _ := execCtx.ParseContext.GteTableName()
+		tableName, _ := execCtx.ParseContext.GetTableName()
 		metaData, err := datasource.GetTableCache(types.DBTypeMySQL).GetTableMeta(ctx, execCtx.DBName, tableName)
 		if err != nil {
 			return "", nil, err
