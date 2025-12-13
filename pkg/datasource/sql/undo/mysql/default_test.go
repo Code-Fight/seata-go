@@ -15,28 +15,45 @@
  * limitations under the License.
  */
 
-package compressor
+package mysql
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"seata.apache.org/seata-go/pkg/datasource/sql/types"
+	"seata.apache.org/seata-go/pkg/datasource/sql/undo"
 )
 
-func TestZipCompress(t *testing.T) {
-	str := "test"
+func TestInitUndoLogManager(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("InitUndoLogManager should not panic, but got: %v", r)
+		}
+	}()
 
-	g := &Zip{}
+	InitUndoLogManager()
 
-	compressRes, err := g.Compress([]byte(str))
+	manager, err := undo.GetUndoLogManager(types.DBTypeMySQL)
 	assert.NoError(t, err)
-	t.Logf("compress res: %v", string(compressRes))
+	assert.NotNil(t, manager)
+	assert.Equal(t, types.DBTypeMySQL, manager.DBType())
 
-	assert.EqualValues(t, CompressorZip, g.GetCompressorType())
+	assert.IsType(t, &undoLogManager{}, manager)
+}
 
-	decompressRes, err := g.Decompress(compressRes)
+func TestInitUndoLogManager_Multiple(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Multiple calls to InitUndoLogManager should not panic, but got: %v", r)
+		}
+	}()
+
+	InitUndoLogManager()
+	InitUndoLogManager()
+
+	manager, err := undo.GetUndoLogManager(types.DBTypeMySQL)
 	assert.NoError(t, err)
-	t.Logf("decompress res: %v", string(decompressRes))
-
-	assert.Equal(t, str, string(decompressRes))
+	assert.NotNil(t, manager)
 }

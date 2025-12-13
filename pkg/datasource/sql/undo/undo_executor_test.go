@@ -15,28 +15,43 @@
  * limitations under the License.
  */
 
-package compressor
+package undo
 
 import (
+	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
+	"seata.apache.org/seata-go/pkg/datasource/sql/types"
 )
 
-func TestZipCompress(t *testing.T) {
-	str := "test"
+type mockUndoExecutorImpl struct {
+	mock.Mock
+}
 
-	g := &Zip{}
+func (m *mockUndoExecutorImpl) ExecuteOn(ctx context.Context, dbType types.DBType, conn *sql.Conn) error {
+	args := m.Called(ctx, dbType, conn)
+	return args.Error(0)
+}
 
-	compressRes, err := g.Compress([]byte(str))
+func TestUndoExecutor_Interface(t *testing.T) {
+	executor := &mockUndoExecutorImpl{}
+	assert.Implements(t, (*UndoExecutor)(nil), executor)
+}
+
+func TestUndoExecutor_ExecuteOn(t *testing.T) {
+	executor := &mockUndoExecutorImpl{}
+	ctx := context.Background()
+	dbType := types.DBTypeMySQL
+	var conn *sql.Conn
+
+	executor.On("ExecuteOn", ctx, dbType, conn).Return(nil)
+
+	err := executor.ExecuteOn(ctx, dbType, conn)
 	assert.NoError(t, err)
-	t.Logf("compress res: %v", string(compressRes))
 
-	assert.EqualValues(t, CompressorZip, g.GetCompressorType())
-
-	decompressRes, err := g.Decompress(compressRes)
-	assert.NoError(t, err)
-	t.Logf("decompress res: %v", string(decompressRes))
-
-	assert.Equal(t, str, string(decompressRes))
+	executor.AssertExpectations(t)
 }

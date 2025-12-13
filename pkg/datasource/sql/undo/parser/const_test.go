@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package compressor
+package parser
 
 import (
 	"testing"
@@ -23,20 +23,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestZipCompress(t *testing.T) {
-	str := "test"
+func TestDefaultSerializer(t *testing.T) {
+	assert.Equal(t, "json", DefaultSerializer)
+}
 
-	g := &Zip{}
+func TestDefaultSerializerIsJsonString(t *testing.T) {
+	assert.IsType(t, "", DefaultSerializer)
+	assert.NotEmpty(t, DefaultSerializer)
+	assert.Contains(t, []string{"json", "protobuf"}, DefaultSerializer)
+}
 
-	compressRes, err := g.Compress([]byte(str))
+func TestDefaultSerializerUsedByCache(t *testing.T) {
+	cache := GetCache()
+	defaultParser, err := cache.GetDefault()
 	assert.NoError(t, err)
-	t.Logf("compress res: %v", string(compressRes))
-
-	assert.EqualValues(t, CompressorZip, g.GetCompressorType())
-
-	decompressRes, err := g.Decompress(compressRes)
-	assert.NoError(t, err)
-	t.Logf("decompress res: %v", string(decompressRes))
-
-	assert.Equal(t, str, string(decompressRes))
+	assert.NotNil(t, defaultParser)
+	assert.Equal(t, DefaultSerializer, defaultParser.GetName())
 }
